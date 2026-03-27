@@ -10,20 +10,16 @@ import requests
 #  PAGE CONFIG
 # ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="GATEWAYS 2025 Analytics",
+    page_title="GATEWAYS 2025",
     page_icon="G",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ─────────────────────────────────────────────
-#  CHART THEME
-# ─────────────────────────────────────────────
 CHART_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family="sans-serif", color="#e0e0e0", size=12),
-    title_font=dict(size=14, color="#ffffff"),
+    font=dict(family="sans-serif", color="#000000", size=12),
     margin=dict(t=45, b=20, l=10, r=10),
     colorway=["#00d4ff", "#7c3aed", "#ff6b35", "#22c55e", "#f59e0b", "#ec4899", "#06b6d4"],
 )
@@ -33,6 +29,13 @@ PURPLE = "#7c3aed"
 ORANGE = "#ff6b35"
 GREEN  = "#22c55e"
 AMBER  = "#f59e0b"
+
+TITLE_FONT = dict(size=14, color="#000000")
+
+def ct(text: str) -> dict:
+    """Return a Plotly title dict with consistent font styling."""
+    return dict(text=text, font=TITLE_FONT)
+
 
 STATE_COORDS = {
     "Kerala":        (10.85,  76.27),
@@ -55,22 +58,29 @@ def load_data():
     df.columns = df.columns.str.strip()
     return df
 
-@st.cache_data
+@st.cache_data(ttl=3600, show_spinner=False)
 def fetch_india_geojson():
-    url = "https://raw.githubusercontent.com/Subhash9325/GeoJson-Data-of-Indian-States/master/Indian_States"
-    try:
-        r = requests.get(url, timeout=8)
-        if r.status_code == 200:
-            return r.json()
-    except Exception:
-        pass
+    """Fetch India state boundaries GeoJSON. Returns None on failure."""
+    urls = [
+        
+        "https://raw.githubusercontent.com/geohacker/india/master/state/india_state.geojson",
+
+        "https://raw.githubusercontent.com/Subhash9325/GeoJson-Data-of-Indian-States/master/Indian_States",
+    ]
+    for url in urls:
+        try:
+            r = requests.get(url, timeout=10)
+            if r.status_code == 200:
+                data = r.json()
+                if data:
+                    return data
+        except Exception:
+            continue
     return None
+
 
 df = load_data()
 
-# ─────────────────────────────────────────────
-#  HELPER: build india map figure
-# ─────────────────────────────────────────────
 def build_india_map(state_counts, geojson, height=600):
     map_layout = {**CHART_LAYOUT, "margin": dict(t=10, b=0, l=0, r=0)}
 
@@ -85,7 +95,6 @@ def build_india_map(state_counts, geojson, height=600):
             hover_data={"Participants": True, "Avg_Rating": True, "Revenue": True,
                         "lat": False, "lon": False},
             color_continuous_scale=[[0, "#0d1540"], [0.5, CYAN], [1.0, PURPLE]],
-            title="",
         )
         fig.update_geos(fitbounds="locations", visible=False, bgcolor="rgba(0,0,0,0)")
     else:
@@ -96,15 +105,14 @@ def build_india_map(state_counts, geojson, height=600):
             text=state_counts["State"],
             mode="markers+text",
             textposition="top center",
-            textfont=dict(color="#ffffff", size=11),
+            textfont=dict(color="#000000", size=11),
             marker=dict(
                 size=state_counts["Participants"] / state_counts["Participants"].max() * 45 + 10,
                 color=state_counts["Participants"],
                 colorscale=[[0, "#1a3a7a"], [0.5, CYAN], [1.0, PURPLE]],
                 colorbar=dict(
-                    title="Participants",
-                    titlefont=dict(color="#e0e0e0"),
-                    tickfont=dict(color="#e0e0e0"),
+                    title=dict(text="Participants", font=dict(color="#000000")),
+                    tickfont=dict(color="#000000"),
                 ),
                 symbol="square",
                 line=dict(color=CYAN, width=1.5),
@@ -134,9 +142,6 @@ def build_india_map(state_counts, geojson, height=600):
     fig.update_layout(**map_layout, height=height)
     return fig
 
-# ─────────────────────────────────────────────
-#  SIDEBAR FILTERS
-# ─────────────────────────────────────────────
 st.sidebar.title("GATEWAYS 2025")
 st.sidebar.caption("National Level Fest · Analytics Hub")
 st.sidebar.divider()
@@ -167,18 +172,22 @@ if sel_rating:
 
 st.sidebar.metric("Records Shown", len(fdf),
                   f"{len(fdf) - len(df)} delta" if len(fdf) != len(df) else "Full dataset")
-st.sidebar.caption(f"Dataset: {len(df)} participants · {df['Event Name'].nunique()} events · {df['State'].nunique()} states")
+st.sidebar.caption(
+    f"Dataset: {len(df)} participants · {df['Event Name'].nunique()} events · {df['State'].nunique()} states"
+)
 
-# ─────────────────────────────────────────────
 #  HEADER
-# ─────────────────────────────────────────────
-st.title("GATEWAYS 2025 — Analytics Dashboard")
-st.caption(f"National Level Fest · {len(df)} Participants · {df['State'].nunique()} States · {df['Event Name'].nunique()} Events")
+
+st.title("GATEWAYS 2025")
+st.caption(
+    f"National Level Fest · {len(df)} Participants · "
+    f"{df['State'].nunique()} States · {df['Event Name'].nunique()} Events"
+)
 st.divider()
 
-# ─────────────────────────────────────────────
+
 #  KPI ROW
-# ─────────────────────────────────────────────
+
 k1, k2, k3, k4, k5 = st.columns(5)
 k1.metric("Total Participants", f"{len(fdf):,}")
 k2.metric("States Represented", fdf["State"].nunique())
@@ -189,9 +198,7 @@ k5.metric("Revenue Collected", f"Rs.{fdf['Amount Paid'].sum():,}")
 
 st.divider()
 
-# ─────────────────────────────────────────────
 #  TABS
-# ─────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab_dash = st.tabs([
     "India Map",
     "Event Analysis",
@@ -199,10 +206,8 @@ tab1, tab2, tab3, tab4, tab_dash = st.tabs([
     "Feedback & Ratings",
     "Dashboard",
 ])
-
-# ══════════════════════════════════════════════
 #  TAB 1 — INDIA MAP
-# ══════════════════════════════════════════════
+
 with tab1:
     st.subheader("State-wise Participation across India")
 
@@ -211,15 +216,19 @@ with tab1:
         Avg_Rating=("Rating", "mean"),
         Revenue=("Amount Paid", "sum"),
     ).reset_index()
-    state_counts["lat"] = state_counts["State"].map(lambda s: STATE_COORDS.get(s, (20, 78))[0])
-    state_counts["lon"] = state_counts["State"].map(lambda s: STATE_COORDS.get(s, (20, 78))[1])
+    state_counts["lat"] = state_counts["State"].map(
+        lambda s: STATE_COORDS.get(s, (20, 78))[0]
+    )
+    state_counts["lon"] = state_counts["State"].map(
+        lambda s: STATE_COORDS.get(s, (20, 78))[1]
+    )
     state_counts["Avg_Rating"] = state_counts["Avg_Rating"].round(2)
 
     col_map, col_board = st.columns([7, 3])
 
     with col_map:
         st.subheader("India Participation Map")
-        with st.spinner("Loading India map, please wait..."):
+        with st.spinner("Fetching India map data, please wait..."):
             geojson = fetch_india_geojson()
         fig_map = build_india_map(state_counts, geojson, height=620)
         st.plotly_chart(fig_map, use_container_width=True)
@@ -250,14 +259,15 @@ with tab1:
         textposition="outside",
         hovertemplate="<b>%{x}</b><br>Revenue: Rs.%{y:,}<extra></extra>",
     ))
-    fig_rev.update_layout(**CHART_LAYOUT, height=300,
-                          yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"))
+
+    fig_rev.update_layout(
+        **{**CHART_LAYOUT, "margin": dict(t=60, b=20, l=10, r=10)},
+        height=420,
+        yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)"),
+    )
     st.plotly_chart(fig_rev, use_container_width=True)
 
-
-# ══════════════════════════════════════════════
 #  TAB 2 — EVENT ANALYSIS
-# ══════════════════════════════════════════════
 with tab2:
     st.subheader("Event-wise Participation Breakdown")
 
@@ -293,12 +303,12 @@ with tab2:
         donut_layout = {**CHART_LAYOUT, "margin": dict(t=45, b=20, l=20, r=120)}
         fig_donut.update_layout(
             **donut_layout,
-            title="Participation Share by Event",
+            title=ct("Participation Share by Event"),
             height=420,
             legend=dict(
                 orientation="v",
                 x=1.0, y=0.5,
-                font=dict(size=11, color="#e0e0e0"),
+                font=dict(size=11, color="#000000"),
             ),
         )
         st.plotly_chart(fig_donut, use_container_width=True)
@@ -314,9 +324,13 @@ with tab2:
             textposition="outside",
             hovertemplate="<b>%{y}</b><br>%{x} participants<extra></extra>",
         ))
-        fig_hbar.update_layout(**CHART_LAYOUT, title="Participants per Event", height=420,
-                               xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
-                               yaxis=dict(showgrid=False, autorange="reversed"))
+        fig_hbar.update_layout(
+            **CHART_LAYOUT,
+            title=ct("Participants per Event"),
+            height=420,
+            xaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)"),
+            yaxis=dict(showgrid=False, autorange="reversed"),
+        )
         st.plotly_chart(fig_hbar, use_container_width=True)
 
     st.divider()
@@ -327,11 +341,14 @@ with tab2:
         type_breakdown, x="Event Name", y="Count", color="Event Type",
         barmode="group",
         color_discrete_map={"Individual": CYAN, "Group": ORANGE},
-        title="Individual vs Group by Event",
         labels={"Count": "Participants", "Event Name": ""},
     )
-    fig_group.update_layout(**CHART_LAYOUT, height=320,
-                             yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"))
+    fig_group.update_layout(
+        **CHART_LAYOUT,
+        title=ct("Individual vs Group by Event"),
+        height=320,
+        yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)"),
+    )
     st.plotly_chart(fig_group, use_container_width=True)
 
     st.divider()
@@ -350,11 +367,14 @@ with tab2:
     overall_avg = fdf["Rating"].mean()
     fig_rating_event.add_hline(
         y=overall_avg, line_dash="dash", line_color="rgba(255,255,255,0.4)",
-        annotation_text=f"Overall avg: {overall_avg:.2f}", annotation_font_color="#ffffff",
+        annotation_text=f"Overall avg: {overall_avg:.2f}",
+        annotation_font_color="#000000",
     )
-    fig_rating_event.update_layout(**CHART_LAYOUT, height=300,
-                                    yaxis=dict(range=[0, 5.5], showgrid=True,
-                                               gridcolor="rgba(255,255,255,0.05)"))
+    fig_rating_event.update_layout(
+        **CHART_LAYOUT,
+        height=300,
+        yaxis=dict(range=[0, 5.5], showgrid=True, gridcolor="rgba(0,0,0,0.08)"),
+    )
     st.plotly_chart(fig_rating_event, use_container_width=True)
 
     st.divider()
@@ -367,10 +387,7 @@ with tab2:
     display_stats.columns = ["Event", "Participants", "Avg Rating", "Revenue", "Avg Fee"]
     st.dataframe(display_stats, use_container_width=True, hide_index=True)
 
-
-# ══════════════════════════════════════════════
 #  TAB 3 — COLLEGE INSIGHTS
-# ══════════════════════════════════════════════
 with tab3:
     st.subheader("College-wise Participation")
 
@@ -391,16 +408,22 @@ with tab3:
             marker=dict(
                 color=college_stats["Avg_Rating"],
                 colorscale=[[0, "#1a3a7a"], [0.5, CYAN], [1, GREEN]],
-                colorbar=dict(title="Avg Rating"),
+                colorbar=dict(
+                    title=dict(text="Avg Rating", font=dict(color="#000000")),
+                    tickfont=dict(color="#000000"),
+                ),
             ),
             text=college_stats["Participants"],
             textposition="outside",
             hovertemplate="<b>%{y}</b><br>Participants: %{x}<extra></extra>",
         ))
-        fig_col.update_layout(**CHART_LAYOUT, title="Participants & Avg Rating by College",
-                               height=480,
-                               yaxis=dict(autorange="reversed", showgrid=False),
-                               xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"))
+        fig_col.update_layout(
+            **CHART_LAYOUT,
+            title=ct("Participants & Avg Rating by College"),
+            height=600,
+            yaxis=dict(autorange="reversed", showgrid=False),
+            xaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)"),
+        )
         st.plotly_chart(fig_col, use_container_width=True)
 
     with c2:
@@ -425,11 +448,17 @@ with tab3:
         y=heat_pivot.index.tolist(),
         colorscale=[[0, "#05061a"], [0.3, "#0d2060"], [0.7, CYAN], [1, PURPLE]],
         hovertemplate="<b>%{y}</b><br>%{x}: %{z:.0f} participants<extra></extra>",
-        colorbar=dict(title="Count"),
+        colorbar=dict(
+            title=dict(text="Count", font=dict(color="#000000")),
+            tickfont=dict(color="#000000"),
+        ),
     ))
-    fig_heat.update_layout(**CHART_LAYOUT, height=450,
-                            xaxis=dict(tickangle=-20, showgrid=False),
-                            yaxis=dict(showgrid=False))
+    fig_heat.update_layout(
+        **CHART_LAYOUT,
+        height=450,
+        xaxis=dict(tickangle=-20, showgrid=False),
+        yaxis=dict(showgrid=False),
+    )
     st.plotly_chart(fig_heat, use_container_width=True)
 
     st.divider()
@@ -449,10 +478,7 @@ with tab3:
     )
     st.plotly_chart(fig_tree, use_container_width=True)
 
-
-# ══════════════════════════════════════════════
 #  TAB 4 — FEEDBACK & RATINGS
-# ══════════════════════════════════════════════
 with tab4:
     st.subheader("Participant Feedback & Rating Analysis")
 
@@ -469,8 +495,12 @@ with tab4:
             textposition="outside",
             hovertemplate="<b>%{x}</b><br>Count: %{y}<extra></extra>",
         ))
-        fig_rating.update_layout(**CHART_LAYOUT, title="Rating Distribution", height=340,
-                                  yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"))
+        fig_rating.update_layout(
+            **CHART_LAYOUT,
+            title=ct("Rating Distribution"),
+            height=340,
+            yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)"),
+        )
         st.plotly_chart(fig_rating, use_container_width=True)
 
     with c2:
@@ -489,7 +519,7 @@ with tab4:
             ))
         fig_violin.update_layout(
             **CHART_LAYOUT,
-            title="Rating Distribution by Event Type (Violin)",
+            title=ct("Rating Distribution by Event Type (Violin)"),
             height=340,
             yaxis=dict(range=[2, 6]),
         )
@@ -520,9 +550,13 @@ with tab4:
             textposition="outside",
             hovertemplate="<b>%{y}</b><br>Count: %{x}<extra></extra>",
         ))
-        fig_fb.update_layout(**CHART_LAYOUT, title="Feedback Frequency", height=420,
-                              yaxis=dict(autorange="reversed", showgrid=False),
-                              xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"))
+        fig_fb.update_layout(
+            **CHART_LAYOUT,
+            title=ct("Feedback Frequency"),
+            height=420,
+            yaxis=dict(autorange="reversed", showgrid=False),
+            xaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)"),
+        )
         st.plotly_chart(fig_fb, use_container_width=True)
 
     with c2:
@@ -543,11 +577,20 @@ with tab4:
             x=0.5, y=0.5, xref="paper", yref="paper",
             showarrow=False, font=dict(size=16, color=CYAN),
         )
-        fig_sent.update_layout(**CHART_LAYOUT, title="Sentiment Split", height=280)
+        fig_sent.update_layout(
+            **CHART_LAYOUT,
+            title=ct("Sentiment Split"),
+            height=280,
+        )
         st.plotly_chart(fig_sent, use_container_width=True)
 
-        st.info(f"**{pos_n}** of **{total_n}** responses ({pos_n/total_n*100:.1f}%) were positive.")
-        st.success(f"Most common feedback: **\"{feedback_counts.iloc[0]['Feedback']}\"** — {feedback_counts.iloc[0]['Count']} mentions")
+        st.info(
+            f"**{pos_n}** of **{total_n}** responses ({pos_n/total_n*100:.1f}%) were positive."
+        )
+        st.success(
+            f"Most common feedback: **\"{feedback_counts.iloc[0]['Feedback']}\"** "
+            f"— {feedback_counts.iloc[0]['Count']} mentions"
+        )
 
     st.divider()
     st.subheader("Feedback Word Cloud")
@@ -575,7 +618,11 @@ with tab4:
     st.divider()
     st.subheader("Average Rating by State")
 
-    state_rating = fdf.groupby("State")["Rating"].mean().reset_index().sort_values("Rating", ascending=False)
+    state_rating = (
+        fdf.groupby("State")["Rating"].mean()
+        .reset_index()
+        .sort_values("Rating", ascending=False)
+    )
     overall_avg  = fdf["Rating"].mean()
     colors_sr    = [GREEN if r >= 4.3 else (CYAN if r >= 4.0 else ORANGE)
                     for r in state_rating["Rating"]]
@@ -588,11 +635,17 @@ with tab4:
         textposition="outside",
         hovertemplate="<b>%{x}</b><br>Avg Rating: %{y:.2f}<extra></extra>",
     ))
-    fig_sr.add_hline(y=overall_avg, line_dash="dot", line_color="rgba(255,255,255,0.4)",
-                     annotation_text=f"Overall: {overall_avg:.2f}", annotation_font_color="#ffffff")
-    fig_sr.update_layout(**CHART_LAYOUT, title="Average Rating by State", height=300,
-                          yaxis=dict(range=[0, 5.5], showgrid=True,
-                                     gridcolor="rgba(255,255,255,0.05)"))
+    fig_sr.add_hline(
+        y=overall_avg, line_dash="dot", line_color="rgba(255,255,255,0.4)",
+        annotation_text=f"Overall: {overall_avg:.2f}",
+        annotation_font_color="#000000",
+    )
+    fig_sr.update_layout(
+        **CHART_LAYOUT,
+        title=ct("Average Rating by State"),
+        height=300,
+        yaxis=dict(range=[0, 5.5], showgrid=True, gridcolor="rgba(0,0,0,0.08)"),
+    )
     st.plotly_chart(fig_sr, use_container_width=True)
 
     st.divider()
@@ -615,16 +668,14 @@ with tab4:
         st.info(f"**Group Events:** {pct_group:.1f}% of all registrations were group-based.")
         st.info(f"**Total Revenue:** Rs.{df['Amount Paid'].sum():,} collected across all events.")
 
-
-# ══════════════════════════════════════════════
 #  TAB 5 — DASHBOARD
-# ══════════════════════════════════════════════
+
 with tab_dash:
     st.header("GATEWAYS 2025 — Executive Dashboard")
     st.caption("All key participation, feedback, and revenue insights in one view")
     st.divider()
 
-    # ── Section 1: KPIs ──────────────────────────────────────────────
+
     st.subheader("Key Performance Indicators")
     d1, d2, d3, d4, d5 = st.columns(5)
     d1.metric("Total Participants", f"{len(df):,}")
@@ -634,7 +685,7 @@ with tab_dash:
     d5.metric("Total Revenue", f"Rs.{df['Amount Paid'].sum():,}")
     st.divider()
 
-    # ── Section 2: Participation Trends ──────────────────────────────
+    
     st.subheader("Participation Trends")
     t1, t2 = st.columns(2)
 
@@ -649,9 +700,13 @@ with tab_dash:
             text=ev["Participants"], textposition="outside",
             hovertemplate="<b>%{y}</b><br>%{x} participants<extra></extra>",
         ))
-        fig_ev.update_layout(**CHART_LAYOUT, title="Event-wise Participation", height=320,
-                              xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
-                              yaxis=dict(showgrid=False))
+        fig_ev.update_layout(
+            **CHART_LAYOUT,
+            title=ct("Event-wise Participation"),
+            height=320,
+            xaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)"),
+            yaxis=dict(showgrid=False),
+        )
         st.plotly_chart(fig_ev, use_container_width=True)
 
     with t2:
@@ -665,12 +720,15 @@ with tab_dash:
             text=sv["Participants"], textposition="outside",
             hovertemplate="<b>%{y}</b><br>%{x} participants<extra></extra>",
         ))
-        fig_sv.update_layout(**CHART_LAYOUT, title="State-wise Participation", height=320,
-                              xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
-                              yaxis=dict(showgrid=False))
+        fig_sv.update_layout(
+            **CHART_LAYOUT,
+            title=ct("State-wise Participation"),
+            height=320,
+            xaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)"),
+            yaxis=dict(showgrid=False),
+        )
         st.plotly_chart(fig_sv, use_container_width=True)
 
-    # ── Section 3: College Insights ──────────────────────────────────
     st.subheader("College-wise Participation")
     coll = df.groupby("College").agg(
         Participants=("Student Name", "count"),
@@ -680,34 +738,47 @@ with tab_dash:
 
     fig_coll = go.Figure(go.Bar(
         x=coll["College"], y=coll["Participants"],
-        marker=dict(color=coll["Avg_Rating"],
-                    colorscale=[[0, "#1a3a7a"], [0.5, CYAN], [1, GREEN]],
-                    colorbar=dict(title="Avg Rating")),
+        marker=dict(
+            color=coll["Avg_Rating"],
+            colorscale=[[0, "#1a3a7a"], [0.5, CYAN], [1, GREEN]],
+            colorbar=dict(
+                title=dict(text="Avg Rating", font=dict(color="#000000")),
+                tickfont=dict(color="#000000"),
+            ),
+        ),
         text=coll["Participants"], textposition="outside",
         hovertemplate="<b>%{x}</b><br>Participants: %{y}<extra></extra>",
     ))
-    fig_coll.update_layout(**CHART_LAYOUT, title="Top 10 Colleges (Color = Avg Rating)", height=320,
-                            xaxis=dict(tickangle=-20, showgrid=False),
-                            yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"))
+    fig_coll.update_layout(
+        **CHART_LAYOUT,
+        title=ct("Top 10 Colleges (Color = Avg Rating)"),
+        height=320,
+        xaxis=dict(tickangle=-20, showgrid=False),
+        yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)"),
+    )
     st.plotly_chart(fig_coll, use_container_width=True)
 
     st.divider()
 
-    # ── Section 4: India Map + Rating/Sentiment side by side ─────────
+
     st.subheader("State-wise Participation on India Map")
     map_col, rate_col = st.columns([3, 2])
 
     with map_col:
         st.subheader("India Participation Map")
-        with st.spinner("Loading India map, please wait..."):
-            geojson_d = fetch_india_geojson()
+        with st.spinner("⏳ Fetching India map data, please wait..."):
+            geojson_d = fetch_india_geojson()  
         state_counts_d = df.groupby("State").agg(
             Participants=("Student Name", "count"),
             Avg_Rating=("Rating", "mean"),
             Revenue=("Amount Paid", "sum"),
         ).reset_index()
-        state_counts_d["lat"] = state_counts_d["State"].map(lambda s: STATE_COORDS.get(s, (20, 78))[0])
-        state_counts_d["lon"] = state_counts_d["State"].map(lambda s: STATE_COORDS.get(s, (20, 78))[1])
+        state_counts_d["lat"] = state_counts_d["State"].map(
+            lambda s: STATE_COORDS.get(s, (20, 78))[0]
+        )
+        state_counts_d["lon"] = state_counts_d["State"].map(
+            lambda s: STATE_COORDS.get(s, (20, 78))[1]
+        )
         state_counts_d["Avg_Rating"] = state_counts_d["Avg_Rating"].round(2)
         fig_dm = build_india_map(state_counts_d, geojson_d, height=420)
         st.plotly_chart(fig_dm, use_container_width=True)
@@ -722,16 +793,20 @@ with tab_dash:
             text=rc.values, textposition="outside",
             hovertemplate="<b>%{x}</b><br>Count: %{y}<extra></extra>",
         ))
-        fig_rd.update_layout(**CHART_LAYOUT, title="Overall Rating Distribution", height=200,
-                              yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"))
+        fig_rd.update_layout(
+            **CHART_LAYOUT,
+            title=ct("Overall Rating Distribution"),
+            height=200,
+            yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)"),
+        )
         st.plotly_chart(fig_rd, use_container_width=True)
 
         st.subheader("Sentiment Split")
         fc = df["Feedback on Fest"].value_counts().reset_index()
         fc.columns = ["Feedback", "Count"]
-        NEGATIVE_KW = ["improvement", "issue", "poor", "bad", "worst", "timing"]
+        NEGATIVE_KW2 = ["improvement", "issue", "poor", "bad", "worst", "timing"]
         fc["Sentiment"] = fc["Feedback"].apply(
-            lambda x: "Needs Improvement" if any(kw in x.lower() for kw in NEGATIVE_KW) else "Positive"
+            lambda x: "Needs Improvement" if any(kw in x.lower() for kw in NEGATIVE_KW2) else "Positive"
         )
         pos_d = fc[fc["Sentiment"] == "Positive"]["Count"].sum()
         neg_d = fc[fc["Sentiment"] == "Needs Improvement"]["Count"].sum()
@@ -749,12 +824,15 @@ with tab_dash:
             x=0.5, y=0.5, xref="paper", yref="paper",
             showarrow=False, font=dict(size=14, color=CYAN),
         )
-        fig_sd.update_layout(**CHART_LAYOUT, title="Feedback Sentiment", height=220)
+        fig_sd.update_layout(
+            **CHART_LAYOUT,
+            title=ct("Feedback Sentiment"),
+            height=220,
+        )
         st.plotly_chart(fig_sd, use_container_width=True)
 
     st.divider()
 
-    # ── Section 5: Individual vs Group + Avg Rating per Event ────────
     st.subheader("Event Type Breakdown & Ratings")
     eg1, eg2 = st.columns(2)
 
@@ -764,12 +842,15 @@ with tab_dash:
             type_b, x="Event Name", y="Count", color="Event Type",
             barmode="group",
             color_discrete_map={"Individual": CYAN, "Group": ORANGE},
-            title="Individual vs Group Participation by Event",
             labels={"Count": "Participants", "Event Name": ""},
         )
-        fig_tg.update_layout(**CHART_LAYOUT, height=320,
-                              yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
-                              xaxis=dict(tickangle=-15))
+        fig_tg.update_layout(
+            **CHART_LAYOUT,
+            title=ct("Individual vs Group Participation by Event"),
+            height=320,
+            yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)"),
+            xaxis=dict(tickangle=-15),
+        )
         st.plotly_chart(fig_tg, use_container_width=True)
 
     with eg2:
@@ -777,21 +858,29 @@ with tab_dash:
         ev_r.columns = ["Event", "Avg Rating"]
         fig_er = go.Figure(go.Bar(
             x=ev_r["Event"], y=ev_r["Avg Rating"],
-            marker=dict(color=ev_r["Avg Rating"],
-                        colorscale=[[0, ORANGE], [0.5, CYAN], [1, GREEN]]),
+            marker=dict(
+                color=ev_r["Avg Rating"],
+                colorscale=[[0, ORANGE], [0.5, CYAN], [1, GREEN]],
+            ),
             text=ev_r["Avg Rating"].round(2), textposition="outside",
             hovertemplate="<b>%{x}</b><br>Avg Rating: %{y:.2f}<extra></extra>",
         ))
-        fig_er.add_hline(y=df["Rating"].mean(), line_dash="dash", line_color="rgba(255,255,255,0.4)",
-                         annotation_text=f"Overall: {df['Rating'].mean():.2f}", annotation_font_color="#ffffff")
-        fig_er.update_layout(**CHART_LAYOUT, title="Average Rating per Event", height=320,
-                              yaxis=dict(range=[0, 5.5], showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
-                              xaxis=dict(tickangle=-15, showgrid=False))
+        fig_er.add_hline(
+            y=df["Rating"].mean(), line_dash="dash", line_color="rgba(255,255,255,0.4)",
+            annotation_text=f"Overall: {df['Rating'].mean():.2f}",
+            annotation_font_color="#000000",
+        )
+        fig_er.update_layout(
+            **CHART_LAYOUT,
+            title=ct("Average Rating per Event"),
+            height=320,
+            yaxis=dict(range=[0, 5.5], showgrid=True, gridcolor="rgba(0,0,0,0.08)"),
+            xaxis=dict(tickangle=-15, showgrid=False),
+        )
         st.plotly_chart(fig_er, use_container_width=True)
 
     st.divider()
 
-    # ── Section 6: Revenue + Word Cloud ──────────────────────────────
     st.subheader("Revenue & Feedback Insights")
     rev1, rev2 = st.columns(2)
 
@@ -801,14 +890,20 @@ with tab_dash:
         rev_state = rev_state.sort_values("Revenue", ascending=False)
         fig_rv = go.Figure(go.Bar(
             x=rev_state["State"], y=rev_state["Revenue"],
-            marker=dict(color=rev_state["Revenue"],
-                        colorscale=[[0, "#1a3a7a"], [0.5, CYAN], [1.0, PURPLE]]),
+            marker=dict(
+                color=rev_state["Revenue"],
+                colorscale=[[0, "#1a3a7a"], [0.5, CYAN], [1.0, PURPLE]],
+            ),
             text=[f"Rs.{v:,}" for v in rev_state["Revenue"]],
             textposition="outside",
             hovertemplate="<b>%{x}</b><br>Revenue: Rs.%{y:,}<extra></extra>",
         ))
-        fig_rv.update_layout(**CHART_LAYOUT, title="Revenue by State", height=320,
-                              yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"))
+        fig_rv.update_layout(
+            **{**CHART_LAYOUT, "margin": dict(t=60, b=20, l=10, r=10)},
+            title=ct("Revenue by State"),
+            height=420,
+            yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)"),
+        )
         st.plotly_chart(fig_rv, use_container_width=True)
 
     with rev2:
@@ -827,14 +922,14 @@ with tab_dash:
             ax_d.set_facecolor("none")
             ax_d.imshow(wc_d, interpolation="bilinear")
             ax_d.axis("off")
-            ax_d.set_title("Feedback Word Cloud", color="#ffffff", fontsize=12)
+            ax_d.set_title("Feedback Word Cloud", color="#000000", fontsize=12)
             st.pyplot(fig_wc_d)
         except Exception as e:
             st.warning(f"Word cloud unavailable: {e}")
 
     st.divider()
 
-    # ── Section 7: Summary Insights ──────────────────────────────────
+    # ── Section 7: Summary Insights 
     st.subheader("Summary Insights")
 
     top_state_d        = df.groupby("State").size().idxmax()
@@ -854,8 +949,6 @@ with tab_dash:
         st.warning(f"**Group Participation:** {pct_group_d:.1f}% of registrations")
         st.warning(f"**Total Revenue:** Rs.{df['Amount Paid'].sum():,}")
 
-# ─────────────────────────────────────────────
 #  FOOTER
-# ─────────────────────────────────────────────
 st.divider()
 st.caption("GATEWAYS 2025 · National Level Fest · Analytics Platform · Built with Streamlit")
