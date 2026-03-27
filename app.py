@@ -51,7 +51,7 @@ STATE_COORDS = {
 # ─────────────────────────────────────────────
 @st.cache_data
 def load_data():
-    df = pd.read_csv("/Users/22sarthak/PYTHON/AdvP/ETE/C5-FestDataset - fest_dataset.csv")
+    df = pd.read_csv("C5-FestDataset - fest_dataset.csv")
     df.columns = df.columns.str.strip()
     return df
 
